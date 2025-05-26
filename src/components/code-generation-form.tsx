@@ -1,19 +1,21 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CodeDisplay } from '@/components/code-display';
 import { useToast } from '@/hooks/use-toast';
 import { generateJavaCode, type GenerateJavaCodeInput } from '@/ai/flows/generate-java-code';
-import { Loader2, SparklesIcon } from 'lucide-react';
+import { explainJavaError, type ExplainJavaErrorOutput } from '@/ai/flows/explain-java-error';
+import { Loader2, SparklesIcon, AlertTriangleIcon, CheckCircle2Icon, Loader2 as AnalyzingIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const FormSchema = z.object({
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
@@ -27,6 +29,9 @@ export function CodeGenerationForm() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  const [codeAnalysisResult, setCodeAnalysisResult] = useState<ExplainJavaErrorOutput | null>(null);
+  const [isAnalyzingCode, setIsAnalyzingCode] = useState(false);
+
   const form = useForm<CodeGenerationFormData>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -35,9 +40,45 @@ export function CodeGenerationForm() {
     },
   });
 
+  const descriptionValue = form.watch("description");
+
+  useEffect(() => {
+    const debouncedAnalysis = async (value: string | undefined) => {
+      if (value && value.trim().startsWith("public") && value.length > 15) {
+        setIsAnalyzingCode(true);
+        try {
+          const result = await explainJavaError({ javaCode: value });
+          setCodeAnalysisResult(result);
+        } catch (error) {
+          console.error("Error analyzing code in description:", error);
+          setCodeAnalysisResult({
+            hasError: true,
+            explanation: "Analysis failed. Please try again."
+          });
+        } finally {
+          setIsAnalyzingCode(false);
+        }
+      } else {
+        setCodeAnalysisResult(null); 
+        setIsAnalyzingCode(false);   
+      }
+    };
+
+    const handler = setTimeout(() => {
+      debouncedAnalysis(descriptionValue);
+    }, 1000); // 1-second debounce
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [descriptionValue]);
+
   const onSubmit: SubmitHandler<CodeGenerationFormData> = async (data) => {
     setIsLoading(true);
     setGeneratedCode(null);
+    // Clear any live analysis result when submitting for generation
+    setCodeAnalysisResult(null);
+    setIsAnalyzingCode(false);
     try {
       const aiInput: GenerateJavaCodeInput = { description: data.description };
       const result = await generateJavaCode(aiInput);
@@ -69,10 +110,46 @@ export function CodeGenerationForm() {
                 name="description"
                 render={({ field }) => (
                   <FormItem className="flex flex-col flex-grow">
-                    <FormLabel>Describe the Java code you want to generate:</FormLabel>
+                    <div className="flex items-center justify-between mb-1">
+                      <FormLabel>Describe the Java code you want to generate:</FormLabel>
+                      <div className="flex items-center space-x-2 h-5"> {/* Container for icons */}
+                        {isAnalyzingCode && <AnalyzingIcon className="h-4 w-4 animate-spin text-muted-foreground" />}
+                        {!isAnalyzingCode && codeAnalysisResult && (
+                          codeAnalysisResult.hasError ? (
+                            <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertTriangleIcon className="h-5 w-5 text-destructive cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-sm">
+                                  <p className="text-xs whitespace-pre-wrap">
+                                    <strong>Analysis:</strong><br />
+                                    {codeAnalysisResult.explanation.substring(0, 300) + (codeAnalysisResult.explanation.length > 300 ? '...' : '')}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <CheckCircle2Icon className="h-5 w-5 text-green-500 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-sm">
+                                   <p className="text-xs whitespace-pre-wrap">
+                                    <strong>Analysis:</strong><br />
+                                    {codeAnalysisResult.explanation.substring(0, 300) + (codeAnalysisResult.explanation.length > 300 ? '...' : '')}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )
+                        )}
+                      </div>
+                    </div>
                     <FormControl>
                       <Textarea
-                        placeholder="e.g., A Java function that sorts an array of integers in ascending order."
+                        placeholder="e.g., A Java function that sorts an array of integers... OR type Java code starting with 'public' for a quick analysis."
                         className="resize-none flex-grow min-h-[200px]"
                         {...field}
                       />
@@ -93,7 +170,7 @@ export function CodeGenerationForm() {
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">Currently, only Java is supported.</p>
               </FormItem>
-              <Button type="submit" disabled={isLoading} className="w-full md:w-auto">
+              <Button type="submit" disabled={isLoading || isAnalyzingCode} className="w-full md:w-auto">
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -110,3 +187,4 @@ export function CodeGenerationForm() {
     </Form>
   );
 }
+
