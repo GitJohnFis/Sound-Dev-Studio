@@ -2,20 +2,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CodeGenerationForm } from "@/components/code-generation-form";
 import { ErrorExplanationForm } from "@/components/error-explanation-form";
-import { CodeCompanionLogo } from "@/components/code-companion-logo";
 import { Wand2, AlertCircle } from "lucide-react";
 
 export default function CodeCompanionPage() {
   return (
-    <div className="container mx-auto p-4 md:p-8 min-h-screen flex flex-col">
-      <header className="mb-8 py-4">
-        <CodeCompanionLogo />
-        <p className="text-muted-foreground mt-1 text-lg">
-          Your AI-powered assistant for Java code generation and error analysis.
-        </p>
-      </header>
-
-      <Tabs defaultValue="generate-code" className="w-full flex-grow flex flex-col">
+    <div className="container mx-auto p-4 md:p-8 min-h-[calc(100vh-120px)] flex flex-col"> {/* Adjusted min-height for footer */}
+      {/* Header section removed as it's now in NavigationHeader */}
+      
+      <Tabs defaultValue="generate-code" className="w-full flex-grow flex flex-col mt-4"> {/* Added mt-4 for spacing from global header */}
         <TabsList className="grid w-full grid-cols-2 max-w-lg mx-auto">
           <TabsTrigger value="generate-code" className="text-sm md:text-base py-2.5">
             <Wand2 className="mr-2 h-5 w-5" />
