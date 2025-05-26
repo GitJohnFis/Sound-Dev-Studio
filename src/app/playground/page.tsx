@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { explainJavaError, type ExplainJavaErrorInput, type ExplainJavaErrorOutput } from '@/ai/flows/explain-java-error';
 import { Loader2, PlayIcon, AlertTriangleIcon, CheckCircle2Icon } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const PlaygroundFormSchema = z.object({
@@ -24,6 +24,7 @@ export default function PlaygroundPage() {
   const [analysisResult, setAnalysisResult] = useState<ExplainJavaErrorOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const FlaskConicalIcon = require('lucide-react').FlaskConicalIcon;
 
   const form = useForm<PlaygroundFormData>({
     resolver: zodResolver(PlaygroundFormSchema),
