@@ -5,22 +5,22 @@ import { ErrorExplanationForm } from "@/components/error-explanation-form";
 import { Wand2, AlertCircle } from "lucide-react";
 
 export default function CodeCompanionPage() {
+  const currentYear = new Date().getFullYear();
+
   return (
-    <div className="container mx-auto p-4 md:p-8 min-h-[calc(100vh-120px)] flex flex-col"> {/* Adjusted min-height for footer */}
-      {/* Header section removed as it's now in NavigationHeader */}
-      
-      <Tabs defaultValue="generate-code" className="w-full flex-grow flex flex-col mt-4"> {/* Added mt-4 for spacing from global header */}
+    <div className="container mx-auto p-4 md:p-8 min-h-[calc(100vh-120px)] flex flex-col">
+      <Tabs defaultValue="generate-code" className="w-full flex-grow flex flex-col mt-4">
         <TabsList className="grid w-full grid-cols-2 max-w-lg mx-auto">
-          <TabsTrigger value="generate-code" className="text-sm md:text-base py-2.5">
+          <TabsTrigger value="generate-code" className="text-sm md:text-base py-2.5 flex items-center justify-center">
             <Wand2 className="mr-2 h-5 w-5" />
-            Generate Code
+            <span>Generate Code</span>
           </TabsTrigger>
-          <TabsTrigger value="explain-error" className="text-sm md:text-base py-2.5">
+          <TabsTrigger value="explain-error" className="text-sm md:text-base py-2.5 flex items-center justify-center">
             <AlertCircle className="mr-2 h-5 w-5" />
-            Explain Error
+            <span>Explain Error</span>
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="generate-code" className="flex-grow mt-6">
           <Card className="h-full flex flex-col shadow-xl">
             <CardHeader>
@@ -34,7 +34,7 @@ export default function CodeCompanionPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="explain-error" className="flex-grow mt-6">
           <Card className="h-full flex flex-col shadow-xl">
             <CardHeader>
@@ -49,8 +49,8 @@ export default function CodeCompanionPage() {
           </Card>
         </TabsContent>
       </Tabs>
-       <footer className="text-center py-8 mt-auto text-sm text-muted-foreground">
-        Code Companion &copy; {new Date().getFullYear()}
+      <footer className="text-center py-8 mt-auto text-sm text-muted-foreground">
+        Code Companion &copy; {currentYear}
       </footer>
     </div>
   );

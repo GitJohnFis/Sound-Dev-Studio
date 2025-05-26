@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { explainJavaError, type ExplainJavaErrorInput, type ExplainJavaErrorOutput } from '@/ai/flows/explain-java-error';
-import { Loader2, PlayIcon, AlertTriangleIcon, CheckCircle2Icon } from 'lucide-react';
+import { Loader2, PlayIcon, AlertTriangleIcon, CheckCircle2Icon, TerminalIcon, Trash2Icon } from 'lucide-react'; // Added TerminalIcon, Trash2Icon
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -20,11 +20,97 @@ const PlaygroundFormSchema = z.object({
 
 type PlaygroundFormData = z.infer<typeof PlaygroundFormSchema>;
 
+type ConsoleMessageType = 'log' | 'error' | 'warn' | 'info';
+interface ConsoleMessage {
+  id: string;
+  type: ConsoleMessageType;
+  timestamp: string;
+  message: string;
+}
+
+// Helper to format console arguments
+const formatConsoleArg = (arg: any): string => {
+  if (typeof arg === 'string') return arg;
+  if (arg instanceof Error) return arg.stack || arg.message;
+  try {
+    return JSON.stringify(arg, null, 2);
+  } catch (e) {
+    return '[Unserializable Object]';
+  }
+};
+
+const formatConsoleArgs = (args: any[]): string => {
+  return args.map(formatConsoleArg).join(' ');
+};
+
+
 export default function PlaygroundPage() {
   const [analysisResult, setAnalysisResult] = useState<ExplainJavaErrorOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const FlaskConicalIcon = require('lucide-react').FlaskConicalIcon;
+  const FlaskConicalIcon = require('lucide-react').FlaskConicalIcon; // Keeping existing import style for this icon
+
+  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
+  const consoleContentRef = useRef<HTMLDivElement>(null);
+
+
+  useEffect(() => {
+    const originalConsole = { ...window.console };
+
+    const logToCustomConsole = (type: ConsoleMessageType, args: any[]) => {
+      setConsoleMessages(prevMessages => [
+        ...prevMessages,
+        {
+          id: self.crypto.randomUUID ? self.crypto.randomUUID() : Date.now().toString() + Math.random().toString(),
+          type,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+          message: formatConsoleArgs(args),
+        },
+      ]);
+    };
+
+    window.console.log = (...args: any[]) => {
+      originalConsole.log.apply(originalConsole, args);
+      logToCustomConsole('log', args);
+    };
+    window.console.error = (...args: any[]) => {
+      originalConsole.error.apply(originalConsole, args);
+      logToCustomConsole('error', args);
+    };
+    window.console.warn = (...args: any[]) => {
+      originalConsole.warn.apply(originalConsole, args);
+      logToCustomConsole('warn', args);
+    };
+    window.console.info = (...args: any[]) => {
+      originalConsole.info.apply(originalConsole, args);
+      logToCustomConsole('info', args);
+    };
+
+    // Example log to show the console is working
+    console.log("Playground custom console initialized.");
+
+    return () => {
+      // Restore original console methods when component unmounts
+      window.console.log = originalConsole.log;
+      window.console.error = originalConsole.error;
+      window.console.warn = originalConsole.warn;
+      window.console.info = originalConsole.info;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Auto-scroll console to bottom
+    if (consoleContentRef.current) {
+      const scrollAreaViewport = consoleContentRef.current.parentElement?.parentElement;
+      if (scrollAreaViewport && scrollAreaViewport.hasAttribute('data-radix-scroll-area-viewport')) {
+        scrollAreaViewport.scrollTop = scrollAreaViewport.scrollHeight;
+      }
+    }
+  }, [consoleMessages]);
+
+  const handleClearConsole = () => {
+    setConsoleMessages([]);
+  };
 
   const form = useForm<PlaygroundFormData>({
     resolver: zodResolver(PlaygroundFormSchema),
@@ -36,6 +122,7 @@ export default function PlaygroundPage() {
   const onSubmit: SubmitHandler<PlaygroundFormData> = async (data) => {
     setIsLoading(true);
     setAnalysisResult(null);
+    console.info("Starting Java code analysis for:", data.javaCode.substring(0, 50) + "...");
     try {
       const aiInput: ExplainJavaErrorInput = { javaCode: data.javaCode };
       const result = await explainJavaError(aiInput);
@@ -44,6 +131,11 @@ export default function PlaygroundPage() {
         title: "Analysis Complete",
         description: result.hasError ? "Issues found in your code." : "Code analyzed successfully. No critical issues found.",
       });
+      if (result.hasError) {
+        console.warn("Analysis found issues:", result.explanation);
+      } else {
+        console.log("Analysis complete, no critical issues found.");
+      }
     } catch (error) {
       console.error("Error analyzing code:", error);
       setAnalysisResult({
@@ -149,9 +241,52 @@ export default function PlaygroundPage() {
           </div>
         </form>
       </Form>
+
+      {/* Custom Web Console */}
+      <Card className="mt-6 shadow-lg">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-xl flex items-center">
+              <TerminalIcon className="mr-2 h-5 w-5 text-primary" /> Browser Console
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={handleClearConsole} aria-label="Clear console">
+              <Trash2Icon className="mr-1 h-4 w-4" /> Clear
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[200px] bg-neutral-900 p-3 rounded-md font-mono text-xs border border-neutral-700">
+            <div ref={consoleContentRef} className="space-y-1">
+              {consoleMessages.length === 0 && (
+                <p className="text-neutral-500">Console output from browser JavaScript will appear here...</p>
+              )}
+              {consoleMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`whitespace-pre-wrap ${
+                    msg.type === 'error' ? 'text-destructive' : 'text-neutral-300'
+                  }`}
+                >
+                  <span className="text-neutral-500 mr-2 select-none">{msg.timestamp}</span>
+                  {msg.type === 'warn' && <span className="font-semibold text-yellow-400 mr-1 select-none">WARN:</span>}
+                  {msg.type === 'info' && <span className="font-semibold text-blue-400 mr-1 select-none">INFO:</span>}
+                  {/* For errors, the destructive color is applied to the whole line */}
+                  {msg.type === 'error' && <span className="font-semibold mr-1 select-none">ERROR:</span>}
+                  <span>{msg.message}</span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <p className="mt-2 text-xs text-muted-foreground">
+            This console shows logs from the browser's JavaScript environment for this page. It does not show output from the Java code.
+          </p>
+        </CardContent>
+      </Card>
+
       <footer className="text-center py-6 mt-auto text-sm text-muted-foreground">
         Java Playground &copy; {new Date().getFullYear()}
       </footer>
     </div>
   );
 }
+
